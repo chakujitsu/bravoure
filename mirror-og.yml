@@ -60,3 +60,31 @@ jobs:
             echo "Deleting old release: $TAG"
             gh release delete $TAG --yes --cleanup-tag
           done
+          
+      - name: Calculate Hashes and Update Cask
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          # 1. Get the hashes from the downloaded DMGs
+          ARM_SHA=$(shasum -a 256 Brave-Browser-arm64.dmg | awk '{print $1}')
+          INTEL_SHA=$(shasum -a 256 Brave-Browser-x64.dmg | awk '{print $1}')
+          VERSION=${{ env.BRAVE_VERSION }} # Ensure your workflow sets this variable
+
+          # 2. Clone the Tap repository
+          git clone https://x-access-token:${TAP_TOKEN}@github.com/YOUR_USER/courage-tap.git tap-repo
+          cd tap-repo/Casks
+
+          # 3. Update the courageux.rb file using sed
+          # Update version
+          sed -i '' "s/version \".*\"/version \"$VERSION\"/" courageux.rb
+          # Update ARM SHA
+          sed -i '' "s/arm:[[:space:]]*\".*\"/arm:   \"$ARM_SHA\"/" courageux.rb
+          # Update Intel SHA
+          sed -i '' "s/intel:[[:space:]]*\".*\"/intel: \"$INTEL_SHA\"/" courageux.rb
+
+          # 4. Commit and Push
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add courageux.rb
+          git commit -m "Update courageux to $VERSION"
+          git push
